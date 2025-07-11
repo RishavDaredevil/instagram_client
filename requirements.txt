@@ -6,3 +6,4 @@ starlette~=0.46.2
 aiofiles
 pyjwt
 jinja2
+bcrypt
