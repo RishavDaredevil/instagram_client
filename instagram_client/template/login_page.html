@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login • Instagram</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .main-content { display: flex; align-items: center; justify-content: center; }
+        .phone-art { margin-right: 40px; }
+        .login-container { background-color: #121212; border: 1px solid #363636; padding: 40px; border-radius: 8px; width: 350px; text-align: center; }
+        .logo { font-size: 2.5em; font-family: 'Grand Hotel', cursive; margin-bottom: 20px; }
+        .login-form input { width: 100%; padding: 10px; margin-bottom: 10px; background: #000; border: 1px solid #363636; border-radius: 3px; color: #fff; box-sizing: border-box; }
+        .login-form button { width: 100%; padding: 10px; background-color: #0095f6; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        .separator { display: flex; align-items: center; text-align: center; color: #a8a8a8; margin: 20px 0; }
+        .separator::before, .separator::after { content: ''; flex: 1; border-bottom: 1px solid #363636; }
+        .separator:not(:empty)::before { margin-right: .25em; }
+        .separator:not(:empty)::after { margin-left: .25em; }
+        .signup-link { margin-top: 20px; }
+        .signup-link a { color: #0095f6; font-weight: 600; text-decoration: none; cursor: pointer; }
+        #error-message { color: #ed4956; margin-top: 15px; font-size: 14px; min-height: 20px; }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); }
+        .modal-content { background-color: #262626; margin: 10% auto; padding: 20px; border-radius: 12px; width: 80%; max-width: 400px; }
+        .modal-content h2 { text-align: center; }
+        .modal-content form { display: flex; flex-direction: column; gap: 15px; }
+        .modal-content input, .modal-content textarea { padding: 10px; border-radius: 5px; border: 1px solid #363636; background-color: #121212; color: #fff; }
+        .modal-content button { padding: 10px; background-color: #0095f6; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+        .close { color: #fff; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Sign up to see photos and videos from your friends.</h2>
+            <form id="signup-form">
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <textarea name="bio" placeholder="Bio"></textarea>
+                <label for="profile_pic" style="text-align: left;">Profile Picture:</label>
+                <input type="file" name="profile_pic" accept="image/*" required>
+                <button type="submit">Sign up</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="phone-art">
+             <img src="https://www.instagram.com/static/images/homepage/screenshots/screenshot1.png/fdfe239b7c9f.png" alt="Instagram App Screenshot">
+        </div>
+        <div class="login-container">
+            <div class="logo">Instagram</div>
+            <form id="login-form" class="login-form">
+                <input type="text" name="username" placeholder="Username or email" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit">Log in</button>
+            </form>
+            <div id="error-message"></div>
+            <div class="separator">OR</div>
+            <div class="signup-link">
+                Don't have an account? <a onclick="openModal()">Sign up</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('signupModal');
+        const errorMessageDiv = document.getElementById('error-message');
+        const loginForm = document.getElementById('login-form');
+        const usernameInput = loginForm.elements['username'];
+
+        function openModal() { modal.style.display = 'block'; }
+        function closeModal() { modal.style.display = 'none'; }
+        window.onclick = function(event) { if (event.target == modal) { closeModal(); } }
+
+        // --- Handle Login ---
+        loginForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const urlEncodedData = new URLSearchParams(formData);
+
+            fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: urlEncodedData
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({detail: "An unknown error occurred."}));
+                    throw new Error(errorData.detail || 'Login failed. Please check your credentials.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Save the token AND the username to localStorage
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('username', usernameInput.value); // Use the entered username
+                // Redirect to the main feed
+                window.location.href = '/instagram_posts';
+            })
+            .catch(error => {
+                errorMessageDiv.textContent = error.message;
+            });
+        });
+
+        // --- Handle Sign Up ---
+        document.getElementById('signup-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('/user/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Sign up successful! Please log in.');
+                    closeModal();
+                    loginForm.reset();
+                    document.getElementById('signup-form').reset();
+                } else {
+                    alert('Sign up failed. The username or email might already be taken.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

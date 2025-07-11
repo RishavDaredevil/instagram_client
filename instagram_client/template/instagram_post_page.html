@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Instagram</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #000; color: #fff; }
+        .main-container { display: flex; }
+        .left-sidebar { width: 244px; padding: 20px; border-right: 1px solid #363636; height: 100vh; position: fixed; }
+        .left-sidebar .logo { font-size: 1.8em; font-family: 'Grand Hotel', cursive; margin-bottom: 30px; }
+        .left-sidebar .nav-item { display: flex; align-items: center; padding: 12px; margin-bottom: 8px; cursor: pointer; border-radius: 8px; }
+        .left-sidebar .nav-item:hover { background-color: #1a1a1a; }
+        .left-sidebar .nav-item span { margin-left: 16px; font-size: 16px; }
+
+        /* --- MODIFIED FOR CENTERING --- */
+        .feed-container {
+            margin-left: 244px; /* Width of left sidebar */
+            margin-right: 320px; /* Width of right sidebar */
+            flex-grow: 1;
+            display: flex;
+            justify-content: center; /* Center the feed div */
+        }
+
+        .feed { max-width: 470px; margin-top: 30px; width: 100%; }
+        .post-card { background-color: #000; border: 1px solid #363636; border-radius: 8px; margin-bottom: 20px; }
+        .post-header { display: flex; align-items: center; padding: 14px; }
+        .post-header img { width: 32px; height: 32px; border-radius: 50%; margin-right: 14px; }
+        .post-header .username { font-weight: 600; text-decoration: none; color: #fff; }
+        .post-image img { width: 100%; }
+        .post-actions { display: flex; padding: 8px 14px; }
+        .post-actions .action-btn { background: none; border: none; color: #fff; cursor: pointer; font-size: 24px; margin-right: 12px; }
+
+        /* --- MODIFIED FOR LIKE/UNLIKE --- */
+        .post-actions .like-btn.liked {
+             color: #ed4956; /* Red color for a liked post */
+        }
+
+        .post-likes { padding: 0 14px; font-weight: 600; }
+        .post-caption { padding: 0 14px; margin-top: 5px; }
+        .comments-display { padding: 5px 14px; font-size: 14px; max-height: 100px; overflow-y: auto; }
+        .comments-display .comment { margin-bottom: 4px; }
+        .comments-display strong { margin-right: 5px; }
+        .comment-form { display: flex; padding: 10px 14px; border-top: 1px solid #363636; }
+        .comment-form input { background: none; border: none; color: #fff; flex-grow: 1; outline: none; }
+        .comment-form button { background: none; border: none; color: #0095f6; font-weight: 600; cursor: pointer; }
+        .right-sidebar { width: 320px; padding: 20px; position: fixed; right: 0; }
+        .user-suggestion { display: flex; align-items: center; margin-bottom: 15px; }
+        .user-suggestion img { width: 44px; height: 44px; border-radius: 50%; margin-right: 12px; object-fit: cover; }
+        .user-suggestion .username { font-weight: 600; text-decoration: none; color: #fff; }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8); }
+        .modal-content { background-color: #262626; margin: 15% auto; padding: 20px; border-radius: 12px; width: 80%; max-width: 500px; text-align: center; }
+        .modal-content h2 { text-align: center; border-bottom: 1px solid #363636; padding-bottom: 10px; }
+        .modal-content .close { color: #fff; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .modal-content form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        .modal-content input, .modal-content textarea { padding: 10px; border-radius: 5px; border: 1px solid #363636; background-color: #121212; color: #fff; }
+        .modal-content button { padding: 10px; background-color: #0095f6; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="createPostModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeCreateModal()">&times;</span>
+            <h2>Create new post</h2>
+            <form id="create-post-form">
+                <input type="file" name="image_file" accept="image/*" required>
+                <textarea name="caption" placeholder="Write a caption..." required></textarea>
+                <button type="submit">Share</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="searchModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSearchModal()">&times;</span>
+            <h2>Search</h2>
+            <input type="text" id="search-input" placeholder="Search for users..."
+                   style="width: 100%; padding: 10px; margin-top: 20px; background: #121212; border: 1px solid #363636; border-radius: 3px; color: #fff; box-sizing: border-box;">
+            <div id="search-results" style="margin-top: 20px; text-align: left;"></div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="left-sidebar">
+            <div class="logo">Instagram</div>
+            <div class="nav-item"><span>Home</span></div>
+            <div class="nav-item" onclick="openSearchModal()"><span>Search</span></div>
+            <div class="nav-item" onclick="openCreateModal()"><span>Create</span></div>
+            <a id="profile-link" href="#" style="text-decoration: none; color: white;">
+                <div class="nav-item"><span>Profile</span></div>
+            </a>
+        </div>
+
+        <div class="feed-container">
+            <div class="feed">
+                {% for post in posts %}
+                {% set liker_usernames = post.likes | map(attribute='user.username') %}
+                <div class="post-card">
+                    <div class="post-header">
+                        <img src="{{ post.user.profile_pic_path }}" alt="profile picture">
+                        <a href="/user_page/{{ post.user.username }}" class="username">{{ post.user.username }}</a>
+                    </div>
+                    <div class="post-image"><img src="{{ post.image_path }}" alt="post image"></div>
+                    <div class="post-actions">
+                        <button class="action-btn like-btn"
+                                onclick="toggleLike(this, {{ post.post_id }})"
+                                data-is-liked="false"
+                                data-likers="{{ liker_usernames|join(',') }}">
+                            ♡
+                        </button>
+                        <button class="action-btn">💬</button>
+                    </div>
+                    <div id="like-count-{{ post.post_id }}" class="post-likes">{{ post.likes|length }} likes</div>
+                    <div class="post-caption">
+                        <span class="username">{{ post.user.username }}</span> {{ post.caption }}
+                    </div>
+                    <div class="comments-display" id="comments-{{ post.post_id }}">
+                        {% for comment in post.comments %}
+                        <div class="comment">
+                            <strong>{{ comment.user.username }}</strong>
+                            <span>{{ comment.caption }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <form class="comment-form" data-post-id="{{ post.post_id }}">
+                        <input name="caption" type="text" placeholder="Add a comment..." required>
+                        <button type="submit">Post</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="right-sidebar">
+            <h3>Suggestions For You</h3>
+            {% for user in all_users %}
+            <div class="user-suggestion">
+                <img src="{{ user.profile_pic_path }}" alt="profile picture">
+                <a href="/user_page/{{ user.username }}" class="username">{{ user.username }}</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        const accessToken = localStorage.getItem('access_token');
+        const currentUsername = localStorage.getItem('username');
+
+        document.addEventListener("DOMContentLoaded", function() {
+            if (currentUsername && accessToken) {
+                document.getElementById('profile-link').href = `/user_page/${currentUsername}`;
+                initializeLikeButtons();
+            } else {
+                window.location.href = '/login';
+            }
+        });
+
+        function initializeLikeButtons() {
+            document.querySelectorAll('.like-btn').forEach(button => {
+                const likers = button.dataset.likers.split(',');
+                if (likers.includes(currentUsername)) {
+                    button.dataset.isLiked = 'true';
+                    button.innerHTML = '♥';
+                    button.classList.add('liked');
+                }
+            });
+        }
+
+        function toggleLike(buttonElement, postId) {
+            const isLiked = buttonElement.dataset.isLiked === 'true';
+            const method = isLiked ? 'DELETE' : 'POST';
+            const url = `/post/${postId}/like`;
+
+            fetch(url, {
+                method: method,
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            })
+            .then(response => {
+                if (!response.ok && response.status !== 204) {
+                    throw new Error('Action failed');
+                }
+
+                const likeCountElement = document.getElementById(`like-count-${postId}`);
+                let currentLikes = parseInt(likeCountElement.textContent.split(" ")[0]);
+
+                if (isLiked) {
+                    buttonElement.dataset.isLiked = 'false';
+                    buttonElement.innerHTML = '♡';
+                    buttonElement.classList.remove('liked');
+                    likeCountElement.textContent = `${currentLikes - 1} likes`;
+                } else {
+                    buttonElement.dataset.isLiked = 'true';
+                    buttonElement.innerHTML = '♥';
+                    buttonElement.classList.add('liked');
+                    likeCountElement.textContent = `${currentLikes + 1} likes`;
+                }
+            })
+            .catch(error => console.error('Error toggling like:', error));
+        }
+
+        document.querySelectorAll('.comment-form').forEach(form => {
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                const postId = this.dataset.postId;
+                const input = this.querySelector('input[name="caption"]');
+                const commentText = input.value;
+                if (!commentText.trim()) return;
+                fetch(`/post/${postId}/comment`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ caption: commentText })
+                })
+                .then(response => response.ok ? response.json() : Promise.reject('Failed to post comment.'))
+                .then(newComment => {
+                    const commentsContainer = document.getElementById(`comments-${postId}`);
+                    const newCommentDiv = document.createElement('div');
+                    newCommentDiv.classList.add('comment');
+                    newCommentDiv.innerHTML = `<strong>${newComment.user.username}</strong> <span>${newComment.caption}</span>`;
+                    commentsContainer.appendChild(newCommentDiv);
+                    input.value = '';
+                })
+                .catch(error => { console.error('Error posting comment:', error); alert(error); });
+            });
+        });
+
+        const createPostModal = document.getElementById('createPostModal');
+        function openCreateModal() { createPostModal.style.display = 'block'; }
+        function closeCreateModal() { createPostModal.style.display = 'none'; }
+
+        document.getElementById('create-post-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            fetch('/post', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken },
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) { window.location.reload(); }
+                else { alert('Failed to create post.'); }
+            });
+        });
+
+        const searchModal = document.getElementById('searchModal');
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+
+        function openSearchModal() { searchModal.style.display = 'block'; searchInput.focus(); }
+        function closeSearchModal() { searchModal.style.display = 'none'; }
+
+        searchInput.addEventListener('keyup', function(event) {
+            const query = event.target.value.trim();
+            if (query.length === 0) { searchResults.innerHTML = ''; return; }
+
+            fetch(`/users/search?query=${query}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            })
+            .then(response => {
+                if (!response.ok) { throw new Error('Authorization failed'); }
+                return response.json();
+            })
+            .then(users => {
+                searchResults.innerHTML = '';
+                if (users.length === 0) { searchResults.innerHTML = '<p style="text-align: center; color: #a8a8a8;">No results found.</p>'; return; }
+                users.forEach(user => {
+                    const userElement = document.createElement('a');
+                    userElement.href = `/user_page/${user.username}`;
+                    userElement.style.cssText = `display: flex; align-items: center; padding: 8px; text-decoration: none; color: #fff; border-radius: 8px;`;
+                    userElement.innerHTML = `
+                        <img src="${user.profile_pic_path}" alt="${user.username}" style="width: 44px; height: 44px; border-radius: 50%; margin-right: 12px;">
+                        <span>${user.username}</span>`;
+                    searchResults.appendChild(userElement);
+                });
+            })
+            .catch(err => {
+                console.error('Search error:', err);
+                searchResults.innerHTML = '<p style="text-align: center; color: #ed4956;">Error during search.</p>';
+            });
+        });
+
+        window.addEventListener('click', function(event) {
+            if (event.target == searchModal) { closeSearchModal(); }
+            if (event.target == createPostModal) { closeCreateModal(); }
+        });
+    </script>
+</body>
+</html>
